@@ -76,7 +76,6 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
     );
     event ContributionDistributed(address indexed member, uint256 amount);
     event QuorumUpdated(uint256 oldQuorum, uint256 newQuorum);
-    event NewStokvelOnChain(string _stokvelName,uint256 _stokvelQuorum, address _initContributionAsset);    // This event is only going to be emitted once in stokvel lifetime
 
     // Modifiers
     modifier onlyActiveMember(address member) {
@@ -94,7 +93,6 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
      */
     constructor(
         string memory _uri,
-        string memory _stokvelName,
         uint256 _stokvelQuorum,
         address _contributionAsset
     ) ERC1155(_uri) Ownable(msg.sender) {
@@ -104,7 +102,6 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
         );
         stokvelQuorum = _stokvelQuorum;
         contributionAsset = _contributionAsset;
-        emit NewStokvelOnChain(_stokvelName,_stokvelQuorum,_contributionAsset);
     }
 
     // ==================== Admin Functions ====================

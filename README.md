@@ -67,8 +67,7 @@ A Stokvel is a traditional South African savings scheme where members regularly 
 ```solidity
 // 1. Deploy contract with parameters
 StokvelOnChain stokvel = new StokvelOnChain(
-    "ipfs://metadata/",       // Metadata URI
-    "My Investment Stokvel",  // Stokvel Name
+    "/stokvelOnChain/stokvelOne",       // Metadata URI
     parseEther('1000'),       // Quorum (e.g., 1000 tokens needed for approval)
     0x7452210945903CA9D19AAC6EfC37C5dD7ce90d5a // Contribution asset (ERC20 token address)
 );

@@ -32,7 +32,15 @@ export default defineConfig({
       type: "http",
       chainType: "l1",
       url: configVariable("SEPOLIA_RPC_URL"),
-      accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
+      accounts: [configVariable("SEPOLIA_PRIVATE_KEY")!],
+    },
+  },
+  ignition: {
+    strategyConfig: {
+      create2: {
+        // To learn more about salts, see the CreateX documentation
+        salt: "0x0000000000000000000000000000013030000000000000000000000000000100",
+      },
     },
   },
 });

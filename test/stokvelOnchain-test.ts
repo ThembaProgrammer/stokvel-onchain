@@ -31,7 +31,6 @@ describe("StokvelOnChain", function () {
         const quorum = parseUnits("200", contribution_asset_decimals);
         const stokvel: StokvelOnChain = await ethers.deployContract("StokvelOnChain", [
             '/StokvelOnchain/stokvelOne',
-            'StokvelOne',
             quorum,
             await rand.getAddress()
         ]) as StokvelOnChain;
@@ -66,7 +65,6 @@ describe("StokvelOnChain", function () {
             await expect(
                 ethers.deployContract("StokvelOnChain", [
                     '/StokvelOnchain/stokvelOne',
-                    'StokvelOne',
                     0,
                     await rand.getAddress()
                 ])
@@ -423,7 +421,6 @@ describe("StokvelOnChain", function () {
             const quorum = parseUnits("200", contribution_asset_decimals);
             const stokvel: StokvelOnChain = await ethers.deployContract("StokvelOnChain", [
                 '/StokvelOnchain/stokvelOne',
-                'StokvelOne',
                 quorum,
                 ZeroAddress
             ]) as StokvelOnChain;
@@ -626,7 +623,6 @@ describe("StokvelOnChain", function () {
                 const quorum = parseUnits("200", contribution_asset_decimals);
                 const stokvel: StokvelOnChain = await ethers.deployContract("StokvelOnChain", [
                     '/StokvelOnchain/stokvelOne',
-                    'StokvelOne',
                     quorum,
                     ZeroAddress
                 ]) as StokvelOnChain;
@@ -759,7 +755,6 @@ describe("StokvelOnChain", function () {
                 const quorum = parseUnits("200", contribution_asset_decimals);
                 const stokvel: StokvelOnChain = await ethers.deployContract("StokvelOnChain", [
                     '/StokvelOnchain/stokvelOne',
-                    'StokvelOne',
                     quorum,
                     await rand.getAddress()
                 ]) as StokvelOnChain;
@@ -781,7 +776,6 @@ describe("StokvelOnChain", function () {
                 const quorum = parseUnits("200", contribution_asset_decimals);
                 const stokvel: StokvelOnChain = await ethers.deployContract("StokvelOnChain", [
                     '/StokvelOnchain/stokvelOne',
-                    'StokvelOne',
                     quorum,
                     await rand.getAddress()
                 ]) as StokvelOnChain;
@@ -900,7 +894,6 @@ describe("StokvelOnChain", function () {
                 const quorum = parseUnits("200", contribution_asset_decimals);
                 const stokvel: StokvelOnChain = await ethers.deployContract("StokvelOnChain", [
                     '/StokvelOnchain/stokvelOne',
-                    'StokvelOne',
                     quorum,
                     ZeroAddress
                 ]) as StokvelOnChain;
@@ -931,7 +924,6 @@ describe("StokvelOnChain", function () {
                 const quorum = parseUnits("200", contribution_asset_decimals);
                 const stokvel: StokvelOnChain = await ethers.deployContract("StokvelOnChain", [
                     '/StokvelOnchain/stokvelOne',
-                    'StokvelOne',
                     quorum,
                     await rand.getAddress()
                 ]) as StokvelOnChain;
@@ -1068,7 +1060,6 @@ describe("StokvelOnChain", function () {
             const quorum = parseUnits("200", contribution_asset_decimals);
             const stokvel: StokvelOnChain = await ethers.deployContract("StokvelOnChain", [
                 '/StokvelOnchain/stokvelOne',
-                'StokvelOne',
                 quorum,
                 ZeroAddress
             ]) as StokvelOnChain;
