@@ -1,10 +1,10 @@
 # Stokvel Investment Group Smart Contract 🏦
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Solidity](https://img.shields.io/badge/Solidity-0.8.20-blue)](https://soliditylang.org/)
+[![Solidity](https://img.shields.io/badge/Solidity-0.8.28-blue)](https://soliditylang.org/)
 [![OpenZeppelin](https://img.shields.io/badge/OpenZeppelin-5.0-purple)](https://openzeppelin.com/)
 
-A decentralized implementation of a traditional Stokvel (South African savings/investment group) using blockchain technology and ERC1155 tokens to represent shared asset ownership.
+A decentralized implementation of a traditional Stokvel (South African savings/investment group) using blockchain technology and ERC1155 tokens to represent shared contribution ownership.
 
 ## 📋 Table of Contents
 
@@ -23,43 +23,42 @@ A decentralized implementation of a traditional Stokvel (South African savings/i
 
 ## 🎯 Overview
 
-The **StokvelInvestmentGroup** smart contract enables groups to pool funds, make collective investment decisions, and track shared asset ownership using blockchain technology. Each ERC1155 token ID represents a unique asset owned by the group, with members holding tokens proportional to their investment share.
+The **StokvelOnChain** smart contract enables groups to pool funds, manage membership with IPFS-backed agreements, and track shared contributions using blockchain technology. The contract uses ERC1155 Token ID 1 to represent contribution shares, with members holding tokens proportional to their contributions to the stokvel.
 
 ### What is a Stokvel?
 
 A Stokvel is a traditional South African savings scheme where members regularly contribute to a common pool, which is then used for collective investments, purchases, or distributed among members. This smart contract brings this concept on-chain with:
 
-- **Transparency**: All transactions recorded on blockchain
-- **Democracy**: Proposal-based decision making with weighted voting
+- **Transparency**: All transactions recorded on blockchain and documents stored on decentralized filesystem IPFS 
+- **Membership Management**: IPFS-backed membership agreements with state tracking
 - **Automation**: Smart contract enforces rules automatically
-- **Security**: Non-custodial, member-controlled funds
-- **Fractional Ownership**: ERC1155 tokens represent asset shares
+- **Contribution Tracking**: ERC1155 Token ID 1 represents member contributions
 
 ## ✨ Key Features
 
-### 🤝 Democratic Governance
-- **Proposal System**: Members propose investments, new members, or fund distributions
-- **Weighted Voting**: Voting power based on member's share balance
-- **Configurable Quorum**: Adjustable voting thresholds (default 51%)
-- **Multiple Proposal Types**: Asset purchases, sales, member management, distributions
+### 🤝 Membership Management
+- **IPFS-Backed Agreements**: Each member has a membership agreement stored on IPFS
+- **State Tracking**: Members can be ACTIVE, TRANSFERRED, TERMINATED, or NONMEMBER (i.e address unknown by smart contract)
+- **Membership Transfer**: Transfer membership and contribution tokens to new members
+- **Owner Control**: Contract owner manages all membership operations
 
 ### 💰 Financial Management
-- **Pooled Contributions**: Members contribute ETH to common fund
-- **Share-Based System**: Proportional ownership tracking (1 ETH = 1000 shares initially)
-- **Minimum Contributions**: Configurable entry requirements
-- **Profit Distribution**: Automated proportional payouts to members
+- **ERC20 Contributions**: Members contribute using a specified ERC20 token
+- **Token-Based System**: ERC1155 Token ID 1 represents contribution shares
+- **Proportional Distribution**: Automated proportional payouts based on contribution tokens
+- **Batch Distribution**: Distribute to multiple members in a single transaction
 
-### 🏠 Asset Management (ERC1155)
-- **Multi-Asset Support**: Each token ID represents a unique asset
-- **Asset Types**: Real Estate, Stocks, Cryptocurrency, Business, Other
-- **Value Tracking**: Monitor asset appreciation/depreciation over time
-- **Fractional Ownership**: Members hold tokens proportional to their shares in each asset
+### 🏛️ Governance System
+- **Quorum-Based Approval**: Weighted voting based on contribution token balance
+- **Operator Permissions**: Grant spending permissions after quorum is reached
+- **Owner Authority**: Contract owner facilitates voting and execution
 
 ### 🔐 Security Features
-- **Access Control**: Role-based permissions (ADMIN_ROLE, MEMBER_ROLE)
+- **Owner Control**: Ownable pattern for administrative functions
 - **Reentrancy Protection**: Guards on all fund transfers
 - **Pausable**: Emergency stop mechanism for critical situations
 - **Input Validation**: Comprehensive checks on all operations
+- **Safe ERC20**: SafeERC20 library for secure token transfers
 - **Auditable**: Full event logging for transparency
 
 ## 🔄 How It Works
@@ -67,75 +66,88 @@ A Stokvel is a traditional South African savings scheme where members regularly 
 ### Phase 1: Formation & Setup
 ```solidity
 // 1. Deploy contract with parameters
-StokvelInvestmentGroup stokvel = new StokvelInvestmentGroup(
-    "My Investment Stokvel",  // Name
-    "ipfs://metadata/",        // Metadata URI
-    0.1 ether,                 // Minimum contribution
-    7 days,                    // Voting period
-    51                         // Quorum percentage
+StokvelOnChain stokvel = new StokvelOnChain(
+    "ipfs://metadata/",       // Metadata URI
+    "My Investment Stokvel",  // Stokvel Name
+    parseEther('1000'),       // Quorum (e.g., 1000 tokens needed for approval)
+    0x7452210945903CA9D19AAC6EfC37C5dD7ce90d5a // Contribution asset (ERC20 token address)
 );
-
-// 2. Founder automatically becomes first member and admin
-// 3. Add initial members via adminAddMember() or proposals
 ```
 
-### Phase 2: Member Contributions
+### Phase 2: Add Members
 ```solidity
-// Members contribute ETH to the pool
-stokvel.contribute{value: 1 ether}();
-// - First member: 1 ETH = 1000 shares
-// - Later members: shares proportional to pool size
+// Owner adds members with IPFS-backed agreements
+stokvel.join(
+    memberAddress, 
+    "ipfs://QmHash123/membership-agreement.pdf"
+);
+```
+
+### Phase 3: Member Contributions
+```solidity
+// Members first approve the stokvel contract to spend their tokens
+contributionToken.approve(stokvelAddress, amount);
+
+// Then contribute to the pool (mints contribution tokens - ID 1)
+stokvel.contribute(1000 * 10**18); // Contribute 1000 tokens
+// - Mints ERC1155 tokens (ID 1) equal to contribution amount
 // - All contributions tracked transparently
 ```
 
-### Phase 3: Asset Investment
+### Phase 4: Governance & Approvals
 ```solidity
-// 1. Member proposes asset purchase
-uint256 proposalId = stokvel.proposeBuyAsset(
-    0.5 ether,
-    "Downtown Apartment",
-    "Prime location real estate investment"
+// 1. Owner collects votes from members to approve an operator
+stokvel.approveToUseContribution(
+    voterAddress,    // Member voting
+    operatorAddress  // Address to grant permission
 );
+// Voting power = member's contribution token balance
 
-// 2. Members vote (voting power = their shares)
-stokvel.vote(proposalId, true);  // Vote in favor
-
-// 3. After voting period, if approved, execute
-stokvel.executeProposal(
-    proposalId,
-    "Downtown Apartment",
-    "Real Estate",
-    "ipfs://asset-metadata/"
+// 2. Once quorum reached, owner grants permission
+stokvel.grantPermissionToUseContribution(
+    operatorAddress,
+    1000 * 10**18  // Amount operator can spend
 );
-// Result: Asset created with unique ID, ERC1155 tokens minted to all members
+// Operator now has ERC20 approval to spend contribution assets
 ```
 
-### Phase 4: Asset Management
+### Phase 5: Distribution
 ```solidity
-// Monitor and update asset values
-stokvel.updateAssetValue(assetId, 0.8 ether);
+// Owner initiates distribution to individual member
+stokvel.distributeContributionAsset(memberAddress);
+// Member receives: (their contribution tokens / total contribution tokens) × pool balance
+// Their contribution tokens are burned
 
-// When profitable, propose sale
-stokvel.proposeSellAsset(assetId, 0.9 ether, "Time to exit");
-// After approval, asset sold and proceeds added to pool
+// Or distribute to multiple members
+address[] memory members = [member1, member2, member3];
+stokvel.batchDistributeContributionAsset(members);
 ```
 
-### Phase 5: Profit Distribution
+### Phase 6: Membership Management
 ```solidity
-// Admin initiates distribution
-stokvel.distributeProfits();
-// Each member receives: (their shares / total shares) × pool balance
+// Transfer membership to new address
+stokvel.transferMembership(
+    newMemberAddress,
+    oldMemberAddress,
+    "ipfs://QmHash456/transfer-agreement.pdf"
+);
+// Transfers all contribution tokens (ID 1) to new member
+
+// Terminate membership
+stokvel.terminateMembership(
+    memberAddress,
+    "ipfs://QmHash789/termination-agreement.pdf"
+);
 ```
 
 ## 🏗️ Architecture
 
 ```
-StokvelInvestmentGroup.sol
-├── ERC1155 (OpenZeppelin)
-│   └── Multi-token standard for asset representation
-├── AccessControl (OpenZeppelin)
-│   ├── ADMIN_ROLE (full control)
-│   └── MEMBER_ROLE (contribute, vote, propose)
+StokvelOnChain.sol
+├── ERC1155Supply (OpenZeppelin)
+│   └── Multi-token standard - Token ID 1 for contributions
+├── Ownable (OpenZeppelin)
+│   └── Owner-based access control
 ├── ReentrancyGuard (OpenZeppelin)
 │   └── Protection against reentrancy attacks
 └── Pausable (OpenZeppelin)
@@ -143,22 +155,24 @@ StokvelInvestmentGroup.sol
 
 Key Components:
 ├── Member Management
-│   ├── Add/Remove members via democratic proposals
-│   ├── Contribution tracking per member
-│   └── Share calculation and balance
-├── Proposal & Voting System
-│   ├── Proposal creation (6 types)
-│   ├── Weighted voting mechanism
-│   └── Quorum-based execution
-├── Asset Management (ERC1155)
-│   ├── Asset purchase and registration
-│   ├── Token minting to members
-│   ├── Value tracking and updates
-│   └── Asset sale and liquidation
-└── Financial Operations
-    ├── ETH contributions
-    ├── Pool balance management
-    └── Proportional profit distributions
+│   ├── IPFS-backed membership agreements
+│   ├── Membership state tracking (ACTIVE, TRANSFERRED, TERMINATED)
+│   ├── Membership transfer functionality
+│   └── Join/terminate operations
+├── Contribution System
+│   ├── ERC20 token contributions
+│   ├── ERC1155 Token ID 1 for tracking shares
+│   └── Contribution token minting
+├── Governance System
+│   ├── Quorum-based approval mechanism
+│   ├── Weighted voting by contribution balance
+│   ├── Operator permission granting
+│   └── Quorum tracking and reset
+└── Distribution Operations
+    ├── Individual member distribution
+    ├── Batch distribution to multiple members
+    ├── Proportional calculation
+    └── Token burning on distribution
 ```
 
 ## 🚀 Getting Started
@@ -221,25 +235,40 @@ const contract = new ethers.Contract(
     signer
 );
 
-// Make a contribution
-await contract.contribute({ value: ethers.parseEther("1.0") });
-
-// Get your member info
-const [contributions, shares, percentage, joinedAt, isActive] = 
-    await contract.getMember(yourAddress);
-
-// Create a proposal
-const tx = await contract.proposeBuyAsset(
-    ethers.parseEther("0.5"),
-    "Investment Property",
-    "Downtown commercial space"
+// Owner adds a member
+await contract.join(
+    memberAddress,
+    "ipfs://QmHash/membership.pdf"
 );
 
-// Vote on a proposal
-await contract.vote(proposalId, true);
+// Member approves token spending
+const tokenContract = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, signer);
+await tokenContract.approve(STOKVEL_ADDRESS, ethers.parseEther("1000"));
 
-// Check your asset balance
-const balance = await contract.balanceOf(yourAddress, assetId);
+// Member contributes
+await contract.contribute(ethers.parseEther("1000"));
+
+// Check contribution balance (Token ID 1)
+const balance = await contract.getContributionBalance(memberAddress);
+
+// Get member info
+const memberInfo = await contract.getMember(memberAddress);
+console.log(memberInfo.contractIPFSHash, memberInfo.state);
+
+// Owner collects approval votes
+await contract.approveToUseContribution(voterAddress, operatorAddress);
+
+// Check quorum status
+const currentQuorum = await contract.getQuorum(operatorAddress);
+
+// Grant permission after quorum reached
+await contract.grantPermissionToUseContribution(
+    operatorAddress,
+    ethers.parseEther("500")
+);
+
+// Distribute to member
+await contract.distributeContributionAsset(memberAddress);
 ```
 
 ## 📚 Documentation
@@ -257,38 +286,41 @@ Comprehensive documentation is available:
 
 All functions are documented with NatSpec comments in the contract. Key functions:
 
-**Member Functions:**
-- `contribute()` - Add funds to the pool
-- `proposeAddMember()` - Propose new member
-- `proposeRemoveMember()` - Propose member removal
-- `proposeBuyAsset()` - Propose asset purchase
-- `proposeSellAsset()` - Propose asset sale
-- `vote()` - Vote on active proposal
-- `executeProposal()` - Execute approved proposal
-
-**Admin Functions:**
-- `adminAddMember()` - Directly add member (initial setup)
-- `updateAssetValue()` - Update asset valuation
-- `updateMinimumContribution()` - Change minimum
+**Owner Functions:**
+- `join()` - Add new member with IPFS agreement
+- `transferMembership()` - Transfer membership to new address
+- `terminateMembership()` - Terminate member's membership
+- `setContributionERC20()` - Set contribution token address
+- `setStokvelQuorum()` - Update quorum requirement
+- `approveToUseContribution()` - Record member's approval vote
+- `grantPermissionToUseContribution()` - Grant operator spending permission after quorum
+- `resetQuorum()` - Reset operator's quorum
+- `distributeContributionAsset()` - Distribute to single member
+- `batchDistributeContributionAsset()` - Distribute to multiple members
 - `pause()`/`unpause()` - Emergency controls
-- `distributeProfits()` - Trigger profit distribution
+- `setURI()` - Update metadata URI
+
+**Member Functions:**
+- `contribute()` - Add contribution tokens to the pool
 
 **View Functions:**
-- `getMember()` - Get member details
-- `getProposal()` - Get proposal details
-- `getAsset()` - Get asset information
-- `getActiveMembers()` - List all active members
-- `getActiveAssets()` - List all active assets
-- `getTotalPortfolioValue()` - Get total value
+- `getMember()` - Get member details and IPFS hash
+- `isActiveMember()` - Check if address is active member
+- `getQuorum()` - Get current quorum for operator
+- `getContributionBalance()` - Get member's contribution token balance
+- `getTotalContributions()` - Get total contribution tokens
+- `getContributionAssetBalance()` - Get contract's ERC20 balance
+- `balanceOf()` - Get ERC1155 token balance (standard function)
 
 ## 🔒 Security
 
 ### Security Features Implemented
 
-✅ **Access Control**: Role-based permissions with OpenZeppelin AccessControl
+✅ **Owner Control**: Ownable pattern with single owner authority
 ✅ **Reentrancy Guard**: Protection on all fund transfer functions
 ✅ **Pausable**: Emergency pause mechanism for critical situations
 ✅ **Input Validation**: Comprehensive checks (zero addresses, minimum values, etc.)
+✅ **Safe ERC20**: SafeERC20 library for secure token operations
 ✅ **Overflow Protection**: Solidity 0.8+ built-in protection
 ✅ **Event Logging**: Complete audit trail of all operations
 
@@ -298,9 +330,9 @@ All functions are documented with NatSpec comments in the contract. Key function
 
 **Before Mainnet Deployment:**
 1. ✅ Code review completed
-2. ✅ Unit tests (100% coverage)
+2. ✅ Unit tests (comprehensive coverage)
 3. ⚠️ Professional security audit (REQUIRED)
-4. ⚠️ Multi-signature admin wallet setup
+4. ⚠️ Multi-signature owner wallet setup recommended
 5. ⚠️ Monitoring and alerting system
 6. ⚠️ Emergency response procedures
 
@@ -308,10 +340,11 @@ All functions are documented with NatSpec comments in the contract. Key function
 
 See [SECURITY_AUDIT.md](./SECURITY_AUDIT.md) for detailed analysis:
 
-- **DoS Risk**: Unbounded loops in profit distribution (recommend pull-based pattern for large groups)
-- **Oracle Dependency**: Asset valuation is centralized (recommend Chainlink integration)
-- **Front-Running**: Proposal voting susceptible to front-running (time locks can mitigate)
-- **Gas Costs**: Large member counts increase gas costs (pagination recommended)
+- **Centralization Risk**: Owner has significant control - recommend multi-sig wallet
+- **DoS Risk**: Unbounded loops in batch distribution (recommend limiting batch size)
+- **Quorum Reset**: Owner can reset quorum - ensure proper governance procedures
+- **Gas Costs**: Large member counts increase gas costs for batch operations
+- **Operator Approval**: Operator receives ERC20 approval - ensure operator is trusted
 
 ### Reporting Security Issues
 
@@ -326,8 +359,8 @@ We appreciate responsible disclosure and will credit researchers.
 ```
 ✅ Member Management      100%
 ✅ Contributions          100%
-✅ Proposals & Voting     100%
-✅ Asset Management       100%
+✅ Governance & Quorum    100%
+✅ Distribution           100%
 ✅ Security               100%
 ✅ Edge Cases             100%
 ✅ Integration Tests      100%
@@ -343,7 +376,7 @@ npx hardhat test
 REPORT_GAS=true npx hardhat test
 
 # Run specific test file
-npx hardhat test test/StokvelInvestmentGroup.test.js
+npx hardhat test test/StokvelOnChain.test.js
 
 # Generate coverage report
 npx hardhat coverage
@@ -381,10 +414,9 @@ ETHERSCAN_API_KEY=your_etherscan_api_key
 
 # Deployment parameters
 STOKVEL_NAME="My Investment Stokvel"
-MINIMUM_CONTRIBUTION=100000000000000000  # 0.1 ETH
-VOTING_PERIOD=604800  # 7 days
-QUORUM_PERCENTAGE=51
+QUORUM_AMOUNT=1000000000000000000000  # 1000 tokens (with 18 decimals)
 METADATA_URI=ipfs://QmYourHash/
+CONTRIBUTION_TOKEN=0x7452210945903CA9D19AAC6EfC37C5dD7ce90d5a  # ERC20 token address
 ```
 
 ### Deploy
@@ -395,11 +427,10 @@ npx hardhat run scripts/deploy.js --network sepolia
 
 # Verify on Etherscan
 npx hardhat verify --network sepolia DEPLOYED_ADDRESS \
-    "My Stokvel" \
     "ipfs://metadata/" \
-    "100000000000000000" \
-    "604800" \
-    "51"
+    "My Stokvel" \
+    "1000000000000000000000" \
+    "0x7452210945903CA9D19AAC6EfC37C5dD7ce90d5a"
 ```
 
 See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for detailed instructions.
@@ -410,41 +441,46 @@ Estimated gas costs (approximate, at 30 gwei):
 
 | Operation | Gas Used | Cost (ETH) | Cost (USD @ $2000/ETH) |
 |-----------|----------|------------|------------------------|
-| **Deploy Contract** | 3,500,000 | 0.105 | $210 |
-| **Contribute** | 120,000 | 0.0036 | $7.20 |
-| **Create Proposal** | 150,000 | 0.0045 | $9.00 |
-| **Vote** | 80,000 | 0.0024 | $4.80 |
-| **Execute Proposal** | 250,000 | 0.0075 | $15.00 |
-| **Update Asset Value** | 60,000 | 0.0018 | $3.60 |
-| **Distribute Profits** | 150,000+ | 0.0045+ | $9.00+ |
+| **Deploy Contract** | 2,800,000 | 0.084 | $168 |
+| **Join (Add Member)** | 90,000 | 0.0027 | $5.40 |
+| **Contribute** | 110,000 | 0.0033 | $6.60 |
+| **Approve To Use** | 70,000 | 0.0021 | $4.20 |
+| **Grant Permission** | 85,000 | 0.00255 | $5.10 |
+| **Distribute (Single)** | 120,000 | 0.0036 | $7.20 |
+| **Batch Distribute (5 members)** | 400,000 | 0.012 | $24.00 |
+| **Transfer Membership** | 150,000 | 0.0045 | $9.00 |
+| **Terminate Membership** | 80,000 | 0.0024 | $4.80 |
 
 *Note: Actual costs vary based on network congestion and complexity*
 
 ## 🗺️ Roadmap
 
 ### ✅ Phase 1: Core Features (Completed)
-- [x] Member management system
-- [x] Contribution and share calculation
-- [x] Proposal and voting mechanism
-- [x] ERC1155 asset representation
-- [x] Security features (access control, reentrancy guard, pausable)
+- [x] Membership management with IPFS agreements
+- [x] ERC20 contribution system
+- [x] ERC1155 Token ID 1 for contribution tracking
+- [x] Quorum-based governance
+- [x] Proportional distribution mechanism
+- [x] Security features (owner control, reentrancy guard, pausable)
 - [x] Event logging and transparency
 - [x] Comprehensive testing
 
 ### 🚧 Phase 2: Enhanced Features (In Progress)
-- [ ] Pull-based dividend distribution pattern
-- [ ] Chainlink oracle integration for asset pricing
-- [ ] Multi-currency support (USDC, DAI)
-- [ ] NFT integration for membership proof
-- [ ] Improved gas optimization
+- [ ] Multi-signature owner setup
+- [ ] Proposal system for structured governance
+- [ ] Time-locked voting periods
+- [ ] Pull-based distribution pattern
+- [ ] Multi-currency support (multiple ERC20 tokens)
+- [ ] Improved gas optimization for batch operations
 - [ ] UI/UX improvements
 
 ### 📅 Phase 3: Advanced Features (Planned)
+- [ ] Asset tracking system (multiple token IDs)
 - [ ] Cross-chain support (Polygon, Optimism, etc.)
 - [ ] DeFi integrations (lending, staking)
 - [ ] Mobile application
 - [ ] Full DAO framework
-- [ ] Insurance and risk management module
+- [ ] NFT-based membership proof
 - [ ] Social features and community building
 
 ## 🤝 Contributing
