@@ -12,9 +12,13 @@
 
 # Hardhat compilation (v2) support directory
 /cache
+/artifacts
 
 # Typechain output
 /types
 
 # Hardhat coverage reports
 /coverage
+
+# Deployment
+/ignition/deployment
