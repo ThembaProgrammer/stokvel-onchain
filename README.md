@@ -1,52 +1,61 @@
-# Stokvel Investment Group Smart Contract 🏦
+# StokvelOnChain Smart Contract
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.28-blue)](https://soliditylang.org/)
 [![OpenZeppelin](https://img.shields.io/badge/OpenZeppelin-5.0-purple)](https://openzeppelin.com/)
 
-A decentralized implementation of a traditional Stokvel (South African savings/investment group) using blockchain technology and ERC1155 tokens to represent shared contribution ownership.
+A decentralized stokvel (savings club) smart contract built on Ethereum using Solidity. This contract enables group savings with on-chain governance, username membership management, and proportional distribution mechanisms.
 
 ## 📋 Table of Contents
 
 - [Overview](#overview)
 - [Key Features](#key-features)
-- [How It Works](#how-it-works)
 - [Architecture](#architecture)
-- [Getting Started](#getting-started)
-- [Documentation](#documentation)
+- [How It Works](#how-it-works)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Contract Functions](#contract-functions)
+- [Events](#events)
 - [Security](#security)
 - [Testing](#testing)
 - [Deployment](#deployment)
-- [Gas Costs](#gas-costs)
-- [Contributing](#contributing)
+- [Gas Optimization](#gas-optimization)
 - [License](#license)
 
 ## 🎯 Overview
 
-The **StokvelOnChain** smart contract enables groups to pool funds, manage membership with IPFS-backed agreements, and track shared contributions using blockchain technology. The contract uses ERC1155 Token ID 1 to represent contribution shares, with members holding tokens proportional to their contributions to the stokvel.
+**StokvelOnChain** enables groups to pool funds, manage membership with email-based identification, and track shared contributions using blockchain technology. The system uses:
+
+- **Membership Contracts**: Individual smart contracts per member, created via MembershipFactory
+- **Email-Based Identity**: Members identified by email hash (privacy-preserving)
+- **ERC1155 Token ID 1**: Represents contribution shares
+- **IPFS Agreements**: Membership agreements stored on IPFS
 
 ### What is a Stokvel?
 
-A Stokvel is a traditional South African savings scheme where members regularly contribute to a common pool, which is then used for collective investments, purchases, or distributed among members. This smart contract brings this concept on-chain with:
+A Stokvel is a traditional South African savings scheme where members regularly contribute to a common pool. This smart contract brings this concept on-chain with:
 
-- **Transparency**: All transactions recorded on blockchain and documents stored on decentralized filesystem IPFS 
-- **Membership Management**: IPFS-backed membership agreements with state tracking
+- **Transparency**: All transactions recorded on blockchain
+- **Privacy**: Email-based identity with hashed storage
 - **Automation**: Smart contract enforces rules automatically
-- **Contribution Tracking**: ERC1155 Token ID 1 represents member contributions
+- **Individual Custody**: Each member has their own Membership contract
 
 ## ✨ Key Features
 
 ### 🤝 Membership Management
+- **MembershipFactory Pattern**: Creates individual Membership contracts for each member
+- **Email-Based Identity**: Privacy-preserving email hash identification
 - **IPFS-Backed Agreements**: Each member has a membership agreement stored on IPFS
-- **State Tracking**: Members can be ACTIVE, TRANSFERRED, TERMINATED, or NONMEMBER (i.e address unknown by smart contract)
+- **State Tracking**: Members can be NONMEMBER, ACTIVE, TRANSFERRED, or TERMINATED
 - **Membership Transfer**: Transfer membership and contribution tokens to new members
-- **Owner Control**: Contract owner manages all membership operations
+- **Claim Mechanism**: EIP-712 signature-based membership claiming
 
 ### 💰 Financial Management
 - **ERC20 Contributions**: Members contribute using a specified ERC20 token
+- **Individual Membership Contracts**: Each member's funds held in their own contract
 - **Token-Based System**: ERC1155 Token ID 1 represents contribution shares
-- **Proportional Distribution**: Automated proportional payouts based on contribution tokens
-- **Batch Distribution**: Distribute to multiple members in a single transaction
+- **Auto-Approval**: Membership contracts automatically approve Stokvel for max amount
+- **Flexible Withdrawals**: Members can withdraw funds to any address after claiming
 
 ### 🏛️ Governance System
 - **Quorum-Based Approval**: Weighted voting based on contribution token balance
@@ -56,48 +65,123 @@ A Stokvel is a traditional South African savings scheme where members regularly 
 ### 🔐 Security Features
 - **Owner Control**: Ownable pattern for administrative functions
 - **Reentrancy Protection**: Guards on all fund transfers
-- **Pausable**: Emergency stop mechanism for critical situations
+- **Pausable**: Emergency stop mechanism
 - **Input Validation**: Comprehensive checks on all operations
 - **Safe ERC20**: SafeERC20 library for secure token transfers
-- **Auditable**: Full event logging for transparency
+- **EIP-712 Signatures**: Secure membership claiming
+
+## 🏗️ Architecture
+
+```
+System Architecture:
+├── StokvelOnChain.sol
+│   ├── ERC1155Supply (OpenZeppelin)
+│   │   └── Multi-token standard - Token ID 1 for contributions
+│   ├── Ownable (OpenZeppelin)
+│   ├── ReentrancyGuard (OpenZeppelin)
+│   └── Pausable (OpenZeppelin)
+├── MembershipFactory.sol
+│   └── Creates individual Membership contracts
+└── Membership.sol
+    ├── Individual contract per member
+    ├── Holds member's contribution assets
+    ├── Auto-approves Stokvel contract
+    └── EIP-712 claim functionality
+
+Token ID Structure:
+├── Token ID 1: Contribution shares (mandatory)
+└── Token ID 2+: Available for other stokvel assets (optional)
+
+Membership States:
+├── NONMEMBER (0): Address unknown to contract
+├── ACTIVE (1): Member is currently active
+├── TRANSFERRED (2): Membership transferred to another address
+└── TERMINATED (3): Membership has been terminated
+```
 
 ## 🔄 How It Works
 
-### Phase 1: Formation & Setup
+### Phase 1: Deployment & Setup
+
 ```solidity
-// 1. Deploy contract with parameters
+// 1. Deploy MembershipFactory
+MembershipFactory factory = new MembershipFactory();
+
+// 2. Deploy StokvelOnChain with parameters
 StokvelOnChain stokvel = new StokvelOnChain(
-    "/stokvelOnChain/stokvelOne",       // Metadata URI
-    parseEther('1000'),       // Quorum (e.g., 1000 tokens needed for approval)
-    0x7452210945903CA9D19AAC6EfC37C5dD7ce90d5a // Contribution asset (ERC20 token address)
+    "/StokvelOnchain/stokvelOne",    // Metadata URI
+    1000 * 10**18,                    // Quorum (e.g., 1000 tokens)
+    0xRANDCOIN_TOKEN_ADDRESS,             // Contribution asset (ERC20)
+    address(factory)                  // MembershipFactory address
 );
 ```
 
 ### Phase 2: Add Members
+
 ```solidity
-// Owner adds members with IPFS-backed agreements
+// Owner adds member using email
+// This creates a Membership contract for the member
 stokvel.join(
-    memberAddress, 
-    "ipfs://QmHash123/membership-agreement.pdf"
+    "member1@example.com",
+    "QmIPFSHash123"  // IPFS hash of membership agreement
 );
+
+// Get the member's Membership contract address
+address membershipAddr = stokvel.getMembership("member1@example.com");
 ```
 
-### Phase 3: Member Contributions
+### Phase 3: Member Claims Membership
+
 ```solidity
-// Members first approve the stokvel contract to spend their tokens
-contributionToken.approve(stokvelAddress, amount);
+// Member claims their Membership contract using EIP-712 signature
+// Owner generates signature off-chain:
 
-// Then contribute to the pool (mints contribution tokens - ID 1)
-stokvel.contribute(1000 * 10**18); // Contribute 1000 tokens
-// - Mints ERC1155 tokens (ID 1) equal to contribution amount
-// - All contributions tracked transparently
+const domain = {
+    name: "StokvelMembership",
+    version: "1",
+    chainId: chainId,
+    verifyingContract: membershipAddress
+};
+
+const types = {
+    ClaimMembership: [
+        { name: "emailHash", type: "bytes32" },
+        { name: "claimant", type: "address" },
+        { name: "deadline", type: "uint256" }
+    ]
+};
+
+const value = {
+    emailHash: keccak256(email),
+    claimant: memberAddress,
+    deadline: timestamp
+};
+
+const signature = await owner.signTypedData(domain, types, value);
+
+// Member claims ownership
+membership.claim(memberAddress, deadline, signature);
 ```
 
-### Phase 4: Governance & Approvals
+### Phase 4: Member Contributions
+
+```solidity
+// 1. Member sends contribution tokens to their Membership contract
+contributionToken.transfer(membershipAddr, amount);
+
+// 2. Owner triggers contribution on behalf of membership
+// (Membership contract has already approved Stokvel for max amount)
+stokvel.contribute(membershipAddr, amount);
+// - Transfers tokens from Membership to Stokvel
+// - Mints ERC1155 contribution tokens (ID 1) to member's wallet
+```
+
+### Phase 5: Governance & Approvals
+
 ```solidity
 // 1. Owner collects votes from members to approve an operator
 stokvel.approveToUseContribution(
-    voterAddress,    // Member voting
+    voterAddress,    // Member voting (their wallet)
     operatorAddress  // Address to grant permission
 );
 // Voting power = member's contribution token balance
@@ -110,71 +194,49 @@ stokvel.grantPermissionToUseContribution(
 // Operator now has ERC20 approval to spend contribution assets
 ```
 
-### Phase 5: Distribution
+### Phase 6: Distribution
+
 ```solidity
-// Owner initiates distribution to individual member
-stokvel.distributeContributionAsset(memberAddress);
-// Member receives: (their contribution tokens / total contribution tokens) × pool balance
-// Their contribution tokens are burned
+// Owner initiates distribution to member's Membership contract
+stokvel.distributeContributionAsset(membershipAddr);
+// Membership contract receives: (contribution tokens / total) × pool balance
+// Contribution tokens are burned
 
 // Or distribute to multiple members
-address[] memory members = [member1, member2, member3];
-stokvel.batchDistributeContributionAsset(members);
+address[] memory memberships = [membership1, membership2, membership3];
+stokvel.batchDistributeContributionAsset(memberships);
 ```
 
-### Phase 6: Membership Management
+### Phase 7: Member Withdrawals
+
+```solidity
+// After distribution, member can withdraw from their Membership contract
+membership.withdrawTo(
+    tokenAddress,
+    amount,
+    recipientAddress
+);
+```
+
+### Phase 8: Membership Management
+
 ```solidity
 // Transfer membership to new address
 stokvel.transferMembership(
     newMemberAddress,
-    oldMemberAddress,
-    "ipfs://QmHash456/transfer-agreement.pdf"
+    oldMembershipAddr,
+    "QmTransferHash456"
 );
-// Transfers all contribution tokens (ID 1) to new member
+// Transfers all contribution tokens (ID 1) to new member's wallet
 
-// Terminate membership
+// Terminate membership (only if balance is zero)
 stokvel.terminateMembership(
-    memberAddress,
-    "ipfs://QmHash789/termination-agreement.pdf"
+    membershipAddr,
+    "QmTerminateHash789"
 );
 ```
 
-## 🏗️ Architecture
-
-```
-StokvelOnChain.sol
-├── ERC1155Supply (OpenZeppelin)
-│   └── Multi-token standard - Token ID 1 for contributions
-├── Ownable (OpenZeppelin)
-│   └── Owner-based access control
-├── ReentrancyGuard (OpenZeppelin)
-│   └── Protection against reentrancy attacks
-└── Pausable (OpenZeppelin)
-    └── Emergency pause mechanism
-
-Key Components:
-├── Member Management
-│   ├── IPFS-backed membership agreements
-│   ├── Membership state tracking (ACTIVE, TRANSFERRED, TERMINATED)
-│   ├── Membership transfer functionality
-│   └── Join/terminate operations
-├── Contribution System
-│   ├── ERC20 token contributions
-│   ├── ERC1155 Token ID 1 for tracking shares
-│   └── Contribution token minting
-├── Governance System
-│   ├── Quorum-based approval mechanism
-│   ├── Weighted voting by contribution balance
-│   ├── Operator permission granting
-│   └── Quorum tracking and reset
-└── Distribution Operations
-    ├── Individual member distribution
-    ├── Batch distribution to multiple members
-    ├── Proportional calculation
-    └── Token burning on distribution
-```
-
-## 🚀 Getting Started
+## 📦 Installation
 
 ### Prerequisites
 
@@ -182,305 +244,388 @@ Key Components:
 # Node.js v16 or higher
 node --version
 
-# Package manager (npm or yarn)
-npm --version
-
-# Hardhat or Foundry for development
+# Hardhat
 npx hardhat version
-# or
-forge --version
 ```
 
-### Installation
+### Setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/stokvel-onchain.git
-cd stokvel-onchain
-
 # Install dependencies
-npm install
-
-# Install OpenZeppelin contracts
-npm install @openzeppelin/contracts
+npm install 
 ```
 
-### Quick Start
+### Run tests
 
 ```bash
-# Compile contracts
-npx hardhat compile
-
-# Run tests
-npx hardhat test
-
-# Run tests with coverage
-npx hardhat coverage
-
-# Deploy to local network
-npx hardhat run scripts/deploy.js --network localhost
-
-# Deploy to testnet (Sepolia)
-npx hardhat run scripts/deploy.js --network sepolia
+npx hardhat --coverage test
 ```
 
-### Basic Usage Example
+## 🚀 Usage
+
+### 1. Deployment
+
+```solidity
+// Deploy MembershipFactory first
+const MembershipFactory = await ethers.getContractFactory("MembershipFactory");
+const factory = await MembershipFactory.deploy();
+await factory.waitForDeployment();
+```
+#### or if using ETH sepolia there is alread deployed factor : 0xBd48b01f1B4CB5A7Fa329c48Cb2C3e75d8B75444
+```solidity
+// Deploy MockERC20 (or use existing token)
+const MockERC20 = await ethers.getContractFactory("MockERC20");
+const token = await MockERC20.deploy("RandCoin", "RZAR", 18);
+await token.waitForDeployment();
+
+// Deploy StokvelOnChain
+const StokvelOnChain = await ethers.getContractFactory("StokvelOnChain");
+const stokvel = await StokvelOnChain.deploy(
+    "/StokvelOnchain/stokvelOne",
+    ethers.parseUnits("1000", 18),  // Quorum
+    await token.getAddress(),
+    await factory.getAddress()
+);
+await stokvel.waitForDeployment();
+```
+
+### 2. Add Members
+
+```solidity
+// Owner adds member using email
+await stokvel.join(
+    "member1@example.com",
+    "QmIPFSHash123"
+);
+
+// Get membership contract address
+const membershipAddr = await stokvel.getMembership("member1@example.com");
+```
+
+### 3. Member Claims Membership
 
 ```javascript
-// Connect to deployed contract
-const contract = new ethers.Contract(
-    STOKVEL_ADDRESS,
-    STOKVEL_ABI,
-    signer
-);
+// Generate EIP-712 signature (off-chain)
+const emailHash = ethers.keccak256(ethers.toUtf8Bytes(email));
+const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour
 
-// Owner adds a member
-await contract.join(
-    memberAddress,
-    "ipfs://QmHash/membership.pdf"
-);
+const domain = {
+    name: "StokvelMembership",
+    version: "1",
+    chainId: (await ethers.provider.getNetwork()).chainId,
+    verifyingContract: membershipAddress
+};
 
-// Member approves token spending
-const tokenContract = new ethers.Contract(TOKEN_ADDRESS, ERC20_ABI, signer);
-await tokenContract.approve(STOKVEL_ADDRESS, ethers.parseEther("1000"));
+const types = {
+    ClaimMembership: [
+        { name: "emailHash", type: "bytes32" },
+        { name: "claimant", type: "address" },
+        { name: "deadline", type: "uint256" }
+    ]
+};
 
-// Member contributes
-await contract.contribute(ethers.parseEther("1000"));
+const value = {
+    emailHash: emailHash,
+    claimant: claimantAddress,
+    deadline: deadline
+};
 
-// Check contribution balance (Token ID 1)
-const balance = await contract.getContributionBalance(memberAddress);
+const signature = await owner.signTypedData(domain, types, value);
 
-// Get member info
-const memberInfo = await contract.getMember(memberAddress);
-console.log(memberInfo.contractIPFSHash, memberInfo.state);
-
-// Owner collects approval votes
-await contract.approveToUseContribution(voterAddress, operatorAddress);
-
-// Check quorum status
-const currentQuorum = await contract.getQuorum(operatorAddress);
-
-// Grant permission after quorum reached
-await contract.grantPermissionToUseContribution(
-    operatorAddress,
-    ethers.parseEther("500")
-);
-
-// Distribute to member
-await contract.distributeContributionAsset(memberAddress);
+// Member claims membership
+await membership.claim(claimantAddress, deadline, signature);
 ```
 
-## 📚 Documentation
+### 4. Making Contributions
 
-Comprehensive documentation is available:
+```solidity
+// 1. Send tokens to membership contract
+await token.transfer(membershipAddr, amount);
 
-| Document | Description |
+// 2. Owner triggers contribution
+await stokvel.contribute(membershipAddr, amount);
+```
+
+### 5. Governance Process
+
+```solidity
+// Step 1: Members vote
+await stokvel.approveToUseContribution(voterAddress, operatorAddress);
+
+// Step 2: Grant permission once quorum is reached
+await stokvel.grantPermissionToUseContribution(operatorAddress, amount);
+```
+
+### 6. Distribution
+
+```solidity
+// Single member
+await stokvel.distributeContributionAsset(membershipAddr);
+
+// Batch distribution
+const memberships = [membership1, membership2, membership3];
+await stokvel.batchDistributeContributionAsset(memberships);
+```
+
+### 7. Member Withdrawals
+
+```solidity
+// Member withdraws from their Membership contract
+await membership.withdrawTo(tokenAddress, amount, recipientAddress);
+```
+
+## 📚 Contract Functions
+
+### StokvelOnChain - Admin Functions
+
+| Function | Description |
 |----------|-------------|
-| [**USAGE_GUIDE.md**](./USAGE_GUIDE.md) | Complete usage instructions, examples, and best practices |
-| [**DEPLOYMENT_GUIDE.md**](./DEPLOYMENT_GUIDE.md) | Step-by-step deployment for all networks |
-| [**SECURITY_AUDIT.md**](./SECURITY_AUDIT.md) | Security analysis, vulnerabilities, and recommendations |
-| [**FrontendIntegration.jsx**](./FrontendIntegration.jsx) | React + ethers.js integration examples |
+| `setContributionERC20(address)` | Set the ERC20 token for contributions |
+| `setStokvelQuorum(uint256)` | Update quorum requirement |
+| `pause()` | Pause all contract operations |
+| `unpause()` | Resume contract operations |
+| `join(string, string)` | Add new member by email |
+| `transferMembership(address, address, string)` | Transfer membership |
+| `terminateMembership(address, string)` | Terminate membership (only if balance is zero) |
 
-### API Reference
+### StokvelOnChain - Member Functions
 
-All functions are documented with NatSpec comments in the contract. Key functions:
+| Function | Description |
+|----------|-------------|
+| `contribute(address, uint256)` | Make contribution on behalf of membership |
 
-**Owner Functions:**
-- `join()` - Add new member with IPFS agreement
-- `transferMembership()` - Transfer membership to new address
-- `terminateMembership()` - Terminate member's membership
-- `setContributionERC20()` - Set contribution token address
-- `setStokvelQuorum()` - Update quorum requirement
-- `approveToUseContribution()` - Record member's approval vote
-- `grantPermissionToUseContribution()` - Grant operator spending permission after quorum
-- `resetQuorum()` - Reset operator's quorum
-- `distributeContributionAsset()` - Distribute to single member
-- `batchDistributeContributionAsset()` - Distribute to multiple members
-- `pause()`/`unpause()` - Emergency controls
-- `setURI()` - Update metadata URI
+### StokvelOnChain - Governance Functions
 
-**Member Functions:**
-- `contribute()` - Add contribution tokens to the pool
+| Function | Description |
+|----------|-------------|
+| `approveToUseContribution(address, address)` | Record member's vote |
+| `grantPermissionToUseContribution(address, uint256)` | Grant permission after quorum |
+| `resetQuorum(address)` | Reset operator's quorum |
 
-**View Functions:**
-- `getMember()` - Get member details and IPFS hash
-- `isActiveMember()` - Check if address is active member
-- `getQuorum()` - Get current quorum for operator
-- `getContributionBalance()` - Get member's contribution token balance
-- `getTotalContributions()` - Get total contribution tokens
-- `getContributionAssetBalance()` - Get contract's ERC20 balance
-- `balanceOf()` - Get ERC1155 token balance (standard function)
+### StokvelOnChain - Distribution Functions
+
+| Function | Description |
+|----------|-------------|
+| `distributeContributionAsset(address)` | Distribute to single membership |
+| `batchDistributeContributionAsset(address[])` | Distribute to multiple memberships |
+
+### StokvelOnChain - View Functions
+
+| Function | Description |
+|----------|-------------|
+| `getMembership(string)` | Get Membership contract address by email |
+| `getMember(address)` | Get member information |
+| `isActiveMember(address)` | Check if Membership address is active |
+| `getQuorum(address)` | Get operator's current quorum |
+| `getContributionBalance(address)` | Get member's contribution balance |
+| `getTotalContributions()` | Get total contributions in stokvel |
+| `getContributionAssetBalance()` | Get contract's asset balance |
+
+### Membership - Member Functions
+
+| Function | Description |
+|----------|-------------|
+| `claim(address, uint256, bytes)` | Claim membership with EIP-712 signature |
+| `withdrawTo(address, uint256, address)` | Withdraw tokens to recipient (only claimant) |
+
+### Membership - View Functions
+
+| Function | Description |
+|----------|-------------|
+| `isClaimed()` | Check if membership has been claimed |
+| `claimant()` | Get address of claimant |
+| `getBalance(address)` | Get token balance in Membership contract |
+| `stokvelContract()` | Get Stokvel contract address |
+| `contributionAsset()` | Get contribution asset address |
+| `emailHash()` | Get email hash |
+
+## 📡 Events
+
+### StokvelOnChain Events
+
+```solidity
+event ContributionAssetSet(address indexed asset);
+event MembershipActivated(address indexed membership, string ipfsHash);
+event MembershipTransferred(address indexed newMember, address indexed fromMembership, string ipfsHash);
+event MembershipTerminated(address indexed membership, string ipfsHash);
+event ContributionMade(address indexed member, uint256 amount);
+event ApprovalForContribution(address indexed voter, address indexed operator, uint256 voterWeight, uint256 currentQuorum, uint256 requiredQuorum);
+event PermissionGrantedToUseContribution(address indexed operator, uint256 amount, address indexed asset, uint256 achievedQuorum, uint256 requiredQuorum);
+event ContributionDistributed(address indexed membership, uint256 amount);
+event QuorumUpdated(uint256 oldQuorum, uint256 newQuorum);
+```
+
+### Membership Events
+
+```solidity
+event MembershipClaimed(address indexed claimant, bytes32 indexed emailHash);
+event TokensWithdrawn(address indexed token, uint256 amount, address indexed recipient);
+```
 
 ## 🔒 Security
 
 ### Security Features Implemented
 
-✅ **Owner Control**: Ownable pattern with single owner authority
+✅ **Owner Control**: Ownable pattern for administrative functions
 ✅ **Reentrancy Guard**: Protection on all fund transfer functions
-✅ **Pausable**: Emergency pause mechanism for critical situations
-✅ **Input Validation**: Comprehensive checks (zero addresses, minimum values, etc.)
+✅ **Pausable**: Emergency pause mechanism
+✅ **Input Validation**: Comprehensive checks (zero addresses, minimum values)
 ✅ **Safe ERC20**: SafeERC20 library for secure token operations
-✅ **Overflow Protection**: Solidity 0.8+ built-in protection
+✅ **EIP-712 Signatures**: Secure membership claiming
+✅ **Individual Custody**: Each member has their own Membership contract
+✅ **Auto-Approval**: Membership contracts auto-approve Stokvel (no user approval needed)
 ✅ **Event Logging**: Complete audit trail of all operations
 
-### Security Audit Status
+### Security Considerations
 
-⚠️ **Pre-Audit Phase**: This contract is in development and has NOT been professionally audited.
-
-**Before Mainnet Deployment:**
-1. ✅ Code review completed
-2. ✅ Unit tests (comprehensive coverage)
-3. ⚠️ Professional security audit (REQUIRED)
-4. ⚠️ Multi-signature owner wallet setup recommended
-5. ⚠️ Monitoring and alerting system
-6. ⚠️ Emergency response procedures
-
-### Known Considerations
-
-See [SECURITY_AUDIT.md](./SECURITY_AUDIT.md) for detailed analysis:
-
-- **Centralization Risk**: Owner has significant control - recommend multi-sig wallet
-- **DoS Risk**: Unbounded loops in batch distribution (recommend limiting batch size)
-- **Quorum Reset**: Owner can reset quorum - ensure proper governance procedures
-- **Gas Costs**: Large member counts increase gas costs for batch operations
-- **Operator Approval**: Operator receives ERC20 approval - ensure operator is trusted
+1. **Admin Control**: The contract owner has significant control. Consider using a multisig wallet or DAO for production.
+2. **IPFS Dependencies**: Membership agreements are stored on IPFS. Ensure IPFS hashes are pinned.
+3. **Quorum Management**: Set appropriate quorum thresholds to prevent governance attacks.
+4. **Email Privacy**: Emails are hashed, but ensure off-chain email handling is secure.
+5. **Signature Security**: EIP-712 signatures must be generated securely and not reused.
+6. **Distribution Math**: Uses proportional distribution to prevent rounding errors.
+7. **Membership Termination**: Only allowed when contribution balance is zero.
 
 ### Reporting Security Issues
 
-Found a vulnerability? Please email: security@yourproject.com
-
-We appreciate responsible disclosure and will credit researchers.
+Found a vulnerability? Please report responsibly.
 
 ## 🧪 Testing
 
-### Test Coverage
+### Test Structure
 
 ```
-✅ Member Management      100%
-✅ Contributions          100%
-✅ Governance & Quorum    100%
-✅ Distribution           100%
-✅ Security               100%
-✅ Edge Cases             100%
-✅ Integration Tests      100%
+tests/
+├── membership-test.ts        # Membership contract tests
+└── stokvel-onchain-test.ts  # StokvelOnChain contract tests
 ```
 
 ### Running Tests
 
 ```bash
+# Install dependencies
+npm install
+
 # Run all tests
 npx hardhat test
 
-# Run with gas reporting
-REPORT_GAS=true npx hardhat test
-
 # Run specific test file
-npx hardhat test test/StokvelOnChain.test.js
+npx hardhat test test/membership-test.ts
+npx hardhat test test/stokvel-onchain-test.ts
 
-# Generate coverage report
+# Test coverage
 npx hardhat coverage
 
-# Run tests on fork
-npx hardhat test --network hardhat-fork
 ```
 
-### Test Categories
-
-**Unit Tests**: Test individual functions
-**Integration Tests**: Test full workflows
-**Security Tests**: Test attack vectors
-**Edge Cases**: Test boundary conditions
-**Gas Optimization**: Measure and optimize costs
-
 ## 🚢 Deployment
+
+```bash
+# set sepolia rpc endpoint
+npx hardhat keystore set SEPOLIA_RPC_URL
+
+# set private key with sepolia ETH for deployment
+npx hardhat keystore set SEPOLIA_PRIVATE_KEY
+```
+
+### Hardhat ignition Deployment
+[learn more about hardhat ignition](https://hardhat.org/ignition/docs/getting-started)
+
+```javascript
+import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
+import { parseEther } from "ethers";
+
+const StokvelOnchainModule = buildModule("StokvelOnchainModule", (m) => {
+  const stokvelOnchain = m.contract("StokvelOnChain", [
+    '/StokvelOnchain/stokvelOne',                 // stokvel uri
+    parseEther('100'),                            // Qouram
+    '0x7452210945903CA9D19AAC6EfC37C5dD7ce90d5a', // ERC20 token 
+    '0xBd48b01f1B4CB5A7Fa329c48Cb2C3e75d8B75444'  // FACTORY contract
+  ]);
+  return { stokvelOnchain };
+});
+export default StokvelOnchainModule;
+```
+
+### Deploy Command
+
+```bash
+# Deploy factory to Sepolia testnet or skip and use already deploy factory
+npx hardhat ignition deploy ./ignition/modules/MembershipFactory.ts --network sepolia  
+
+# Deploy stokvel contract
+npx hardhat ignition deploy ./ignition/modules/StokvelOnchain.ts --network sepolia
+```
 
 ### Supported Networks
 
 - **Development**: Hardhat Local, Ganache
-- **Testnets**: Sepolia, Goerli, Mumbai (Polygon), Optimism Goerli
+- **Testnets**: Sepolia, Goerli, Mumbai (Polygon)
 - **Mainnets**: Ethereum, Polygon, Optimism, Arbitrum, Base
 
-### Environment Setup
+## ⚡ Gas Optimization Tips
 
-```bash
-# Copy environment template
-cp .env.example .env
+1. Use `calldata` for function parameters when possible (already implemented)
+2. Batch operations using `batchDistributeContributionAsset`
+3. Consider using events for historical data instead of storage
+4. Optimize quorum calculations for large member counts
+5. Individual Membership contracts reduce gas for single-member operations
 
-# Configure your .env file:
-DEPLOYER_PRIVATE_KEY=your_private_key_here
-SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_KEY
-ETHERSCAN_API_KEY=your_etherscan_api_key
+## 🔄 Upgradeability
 
-# Deployment parameters
-STOKVEL_NAME="My Investment Stokvel"
-QUORUM_AMOUNT=1000000000000000000000  # 1000 tokens (with 18 decimals)
-METADATA_URI=ipfs://QmYourHash/
-CONTRIBUTION_TOKEN=0x7452210945903CA9D19AAC6EfC37C5dD7ce90d5a  # ERC20 token address
+This contract is not upgradeable by design for security and transparency. To upgrade:
+
+1. Deploy new StokvelOnChain version
+2. Use `transferMembership` to migrate members
+3. Use `distributeContributionAsset` to return assets
+4. Deprecate old contract
+
+## 📄 Example Workflow
+
+### Scenario: Monthly Savings Club
+
+```solidity
+// 1. Deploy system
+MembershipFactory factory = new MembershipFactory();
+StokvelOnChain stokvel = new StokvelOnChain(
+    "/StokvelOnchain/stokvelOne",
+    10000 * 10**6,  // 10,000 USDC quorum
+    USDC_ADDRESS,
+    address(factory)
+);
+
+// 2. Add 10 members
+for (uint i = 0; i < 10; i++) {
+    stokvel.join(emails[i], memberAgreementHashes[i]);
+}
+
+// 3. Members claim their memberships
+// (Each member signs and claims ownership of their Membership contract)
+
+// 4. Members contribute monthly
+// Member sends USDC to their Membership contract
+USDC.transfer(membershipAddr, 100 * 10**6);
+// Owner triggers contribution
+stokvel.contribute(membershipAddr, 100 * 10**6);  // $100 USDC
+
+// 5. After 12 months, vote to use funds for investment
+for (uint i = 0; i < 10; i++) {
+    stokvel.approveToUseContribution(memberWallets[i], investmentContract);
+}
+
+// 6. Grant permission to investment contract
+stokvel.grantPermissionToUseContribution(
+    investmentContract,
+    12000 * 10**6  // $12,000 USDC
+);
+
+// 7. After investment period, distribute returns
+address[] memory allMemberships = [membership1, ..., membership10];
+stokvel.batchDistributeContributionAsset(allMemberships);
+
+// 8. Members withdraw from their Membership contracts
+membership.withdrawTo(USDC_ADDRESS, amount, memberWallet);
 ```
-
-### Deploy
-
-```bash
-# Deploy to Sepolia testnet
-npx hardhat run scripts/deploy.js --network sepolia
-
-# Verify on Etherscan
-npx hardhat verify --network sepolia DEPLOYED_ADDRESS \
-    "ipfs://metadata/" \
-    "My Stokvel" \
-    "1000000000000000000000" \
-    "0x7452210945903CA9D19AAC6EfC37C5dD7ce90d5a"
-```
-
-See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for detailed instructions.
-
-## 📊 Gas Costs
-
-Estimated gas costs (approximate, at 30 gwei):
-
-| Operation | Gas Used | Cost (ETH) | Cost (USD @ $2000/ETH) |
-|-----------|----------|------------|------------------------|
-| **Deploy Contract** | 2,800,000 | 0.084 | $168 |
-| **Join (Add Member)** | 90,000 | 0.0027 | $5.40 |
-| **Contribute** | 110,000 | 0.0033 | $6.60 |
-| **Approve To Use** | 70,000 | 0.0021 | $4.20 |
-| **Grant Permission** | 85,000 | 0.00255 | $5.10 |
-| **Distribute (Single)** | 120,000 | 0.0036 | $7.20 |
-| **Batch Distribute (5 members)** | 400,000 | 0.012 | $24.00 |
-| **Transfer Membership** | 150,000 | 0.0045 | $9.00 |
-| **Terminate Membership** | 80,000 | 0.0024 | $4.80 |
-
-*Note: Actual costs vary based on network congestion and complexity*
-
-## 🗺️ Roadmap
-
-### ✅ Phase 1: Core Features (Completed)
-- [x] Membership management with IPFS agreements
-- [x] ERC20 contribution system
-- [x] ERC1155 Token ID 1 for contribution tracking
-- [x] Quorum-based governance
-- [x] Proportional distribution mechanism
-- [x] Security features (owner control, reentrancy guard, pausable)
-- [x] Event logging and transparency
-- [x] Comprehensive testing
-
-### 🚧 Phase 2: Enhanced Features (In Progress)
-- [ ] Multi-signature owner setup
-- [ ] Proposal system for structured governance
-- [ ] Time-locked voting periods
-- [ ] Pull-based distribution pattern
-- [ ] Multi-currency support (multiple ERC20 tokens)
-- [ ] Improved gas optimization for batch operations
-- [ ] UI/UX improvements
-
-### 📅 Phase 3: Advanced Features (Planned)
-- [ ] Asset tracking system (multiple token IDs)
-- [ ] Cross-chain support (Polygon, Optimism, etc.)
-- [ ] DeFi integrations (lending, staking)
-- [ ] Mobile application
-- [ ] Full DAO framework
-- [ ] NFT-based membership proof
-- [ ] Social features and community building
 
 ## 🤝 Contributing
 
@@ -509,17 +654,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **OpenZeppelin**: For security-audited contract libraries
 - **Hardhat**: For the excellent development environment
-- **Ethereum Community**: For innovation and support
-- **Contributors**: All the amazing people who contribute to this project
+- **Ethereum Community**: For innovation and robust community support
 
-## 📞 Support & Community
 
-- **Documentation**: Full docs available in `/docs` folder
-- **Issues**: [GitHub Issues](https://github.com/yourusername/stokvel-onchain/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/stokvel-onchain/discussions)
-- **Discord**: [Join our community](https://discord.gg/yourserver)
-- **Twitter**: [@YourProject](https://twitter.com/yourproject)
-- **Email**: support@yourproject.com
 
 ## ⚖️ Legal Disclaimer
 
