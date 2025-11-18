@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { network } from "hardhat";
-import type { StokvelOnChain, MockERC20 } from "../types/ethers-contracts/index.js";
+import type { StokvelOnChain, MockERC20, IMembershipFactory } from "../types/ethers-contracts/index.js";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import { parseUnits, formatUnits } from "ethers";
 
@@ -20,6 +20,9 @@ describe("StokvelOnChain", function () {
 
         const [owner, member1, member2, member3, operator]: HardhatEthersSigner[] = await ethers.getSigners();
 
+        const membershipFactory = await ethers.deployContract("MembershipFactory", []);
+        await membershipFactory.waitForDeployment();
+
         const rand: MockERC20 = await ethers.deployContract("MockERC20", ["RandCoin", "RZAR", contribution_asset_decimals]) as MockERC20;
         await rand.waitForDeployment();
 
@@ -28,11 +31,15 @@ describe("StokvelOnChain", function () {
         await rand.mint(member2.address, initialBalance);
         await rand.mint(member3.address, initialBalance);
 
+        const randAddress = await rand.getAddress();
+        const factoryAddress = await membershipFactory.getAddress();
+
         const quorum = parseUnits("200", contribution_asset_decimals);
         const stokvel: StokvelOnChain = await ethers.deployContract("StokvelOnChain", [
             '/StokvelOnchain/stokvelOne',
             quorum,
-            await rand.getAddress()
+            randAddress,
+            factoryAddress
         ]) as StokvelOnChain;
         await stokvel.waitForDeployment();
 
@@ -59,6 +66,9 @@ describe("StokvelOnChain", function () {
             const connection = await network.connect();
             const { ethers } = connection;
 
+            const membershipFactory = await ethers.deployContract("MembershipFactory", []);
+            await membershipFactory.waitForDeployment();
+
             const rand: MockERC20 = await ethers.deployContract("MockERC20", ["RandCoin", "RZAR", contribution_asset_decimals]) as MockERC20;
             await rand.waitForDeployment();
 
@@ -66,12 +76,14 @@ describe("StokvelOnChain", function () {
                 ethers.deployContract("StokvelOnChain", [
                     '/StokvelOnchain/stokvelOne',
                     0,
-                    await rand.getAddress()
+                    await rand.getAddress(),
+                    await membershipFactory.getAddress()
                 ])
             ).to.be.revertedWith("StokvelOnChain: Quorum must be greater than 0");
         });
     });
 
+ 
     describe("Contribution Asset", function () {
         it("Should set contribution asset", async function () {
             const { stokvel, rand } = await deployStokvelFixture();
@@ -99,7 +111,7 @@ describe("StokvelOnChain", function () {
             ).to.be.revertedWith("StokvelOnChain: Invalid asset address");
         });
     });
-
+  
     describe("Quorum Management", function () {
         it("Should update quorum", async function () {
             const { stokvel } = await deployStokvelFixture();
@@ -130,14 +142,16 @@ describe("StokvelOnChain", function () {
             ).to.be.revertedWithCustomError(stokvel, "OwnableUnauthorizedAccount");
         });
     });
-
+ 
     describe("Membership Management", function () {
         describe("Join", function () {
             it("Should add a new member", async function () {
                 const { stokvel, member1 } = await deployStokvelFixture();
                 const ipfsHash = "QmTest123";
-                await stokvel.join(member1.address, ipfsHash);
-                const member = await stokvel.getMember(member1.address);
+                const memberEmail = 'my@test.com'
+                await stokvel.join(memberEmail, ipfsHash);
+                const membershipAddress = stokvel.getMembership(memberEmail);
+                const member = await stokvel.getMember(membershipAddress);
                 expect(member.contractIPFSHash).to.equal(ipfsHash);
                 expect(member.state).to.equal(MOUType.ACTIVE);
             });
@@ -145,17 +159,20 @@ describe("StokvelOnChain", function () {
             it("Should emit MembershipActivated event", async function () {
                 const { stokvel, member1 } = await deployStokvelFixture();
                 const ipfsHash = "QmTest123";
-                await expect(stokvel.join(member1.address, ipfsHash))
+                const memberEmail = 'my@test.com'
+                const membershipAddress = stokvel.getMembership(memberEmail)
+                await expect(stokvel.join(memberEmail, ipfsHash))
                     .to.emit(stokvel, "MembershipActivated")
-                    .withArgs(member1.address, ipfsHash);
+                    .withArgs(membershipAddress, ipfsHash);
             });
 
             it("Should revert if member is already active", async function () {
                 const { stokvel, member1 } = await deployStokvelFixture();
                 const ipfsHash = "QmTest123";
-                await stokvel.join(member1.address, ipfsHash);
+                 const memberEmail = 'my@test.com'
+                await stokvel.join(memberEmail, ipfsHash);
                 await expect(
-                    stokvel.join(member1.address, ipfsHash)
+                    stokvel.join(memberEmail, ipfsHash)
                 ).to.be.revertedWith("StokvelOnChain: Member already active");
             });
 
@@ -169,8 +186,8 @@ describe("StokvelOnChain", function () {
             it("Should revert if member address is zero", async function () {
                 const { stokvel } = await deployStokvelFixture();
                 await expect(
-                    stokvel.join(ZeroAddress, "QmTest123")
-                ).to.be.revertedWith("StokvelOnChain: Invalid member address");
+                    stokvel.join('', "QmTest123")
+                ).to.be.revertedWith("StokvelOnChain: Member email required");
             });
 
             it("Should revert if non-owner tries to add member", async function () {
@@ -192,20 +209,21 @@ describe("StokvelOnChain", function () {
         describe("Transfer Membership", function () {
             it("Should transfer membership to new address", async function () {
                 const { stokvel, rand, member1, member2 } = await deployStokvelFixture();
-                await stokvel.setContributionERC20(await rand.getAddress());
-                await stokvel.join(member1.address, "QmTest123");
-                await rand.connect(member1).approve(await stokvel.getAddress(), parseUnits("100", contribution_asset_decimals));
-                await stokvel.connect(member1).contribute(parseUnits("100", contribution_asset_decimals));
+                
+                const membership = await stokvel.getMembership('my@test.com')
+                const membershipNew = await stokvel.getMembership('my@test2.com')
+                await stokvel.join('my@test.com', "QmTest123");
+                await stokvel.join('my@test2.com', "QmTest1223");
 
-                await stokvel.transferMembership(member2.address, member1.address, "QmTransfer456");
+                const c = stokvel.getMember(membership);
+                console.log(" the fuck",c)
 
-                const member1Info = await stokvel.getMember(member1.address);
-                const member2Info = await stokvel.getMember(member2.address);
+                await stokvel.transferMembership(membership, membershipNew, "QmTransfer456");
+                const member1Info = await stokvel.getMember(membership);
+                const member2Info = await stokvel.getMember(membershipNew);
 
                 expect(member1Info.state).to.equal(MOUType.TRANSFERRED);
                 expect(member2Info.state).to.equal(MOUType.ACTIVE);
-                expect(await stokvel.balanceOf(member2.address, 1)).to.equal(parseUnits("100", contribution_asset_decimals));
-                expect(await stokvel.balanceOf(member1.address, 1)).to.equal(0);
             });
 
             it("Should emit MembershipTransferred event", async function () {

@@ -1,19 +1,34 @@
 import hardhatToolboxMochaEthersPlugin from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
+import HardhatContractSizer from '@solidstate/hardhat-contract-sizer';
+
 import { configVariable, defineConfig } from "hardhat/config";
 
 export default defineConfig({
-  plugins: [hardhatToolboxMochaEthersPlugin],
+  plugins: [
+    hardhatToolboxMochaEthersPlugin,
+    HardhatContractSizer
+  ],
+  contractSizer: {
+    unit: "B",
+    runOnCompile: true
+  },
   solidity: {
     profiles: {
       default: {
         version: "0.8.28",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 100,
+          },
+        },
       },
       production: {
         version: "0.8.28",
         settings: {
           optimizer: {
             enabled: true,
-            runs: 1,
+            runs: 200,
           },
         },
       },

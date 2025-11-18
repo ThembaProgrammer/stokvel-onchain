@@ -237,6 +237,8 @@ stokvel.batchDistributeContributionAsset(allMembers);
 
 ## Testing
 
+35090 bytes and exceeds 24576 bytes
+
 ```bash
 # Install dependencies
 npm install

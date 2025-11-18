@@ -8,6 +8,19 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+interface IMembershipFactory {
+    function deployMembership(
+        address stokvel,
+        address asset,
+        bytes32 emailHash
+    ) external returns (address);
+    function computeMembershipAddress(
+        address stokvel,
+        address asset,
+        bytes32 emailHash
+    ) external view returns (address);
+}
+
 /**
  * @title StokvelOnChain
  * @notice A decentralized stokvel (savings club) smart contract with ERC1155 for asset management
@@ -45,6 +58,7 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
     // State variables
     address public contributionAsset; // ERC20 token used for contributions
     uint256 public stokvelQuorum; // Required quorum for approvals
+    IMembershipFactory public factory;
 
     mapping(address => Member) public members; // Member registry
     mapping(address => uint256) public quorum; // Accumulated quorum per operator
@@ -52,7 +66,10 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
 
     // Events
     event ContributionAssetSet(address indexed asset);
-    event MembershipActivated(address indexed member, string ipfsHash);
+    event MembershipActivated(
+        address indexed membershipAddress,
+        string ipfsHash
+    );
     event MembershipTransferred(
         address indexed newMember,
         address indexed fromMember,
@@ -94,14 +111,34 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
     constructor(
         string memory _uri,
         uint256 _stokvelQuorum,
-        address _contributionAsset
+        address _contributionAsset,
+        address _factory
     ) ERC1155(_uri) Ownable(msg.sender) {
         require(
             _stokvelQuorum > 0,
             "StokvelOnChain: Quorum must be greater than 0"
         );
+        require(
+            _contributionAsset != address(0),
+            "StokvelOnChain: Invalid contributionAsset 0 "
+        );
+        require(
+            _factory != address(0),
+            "StokvelOnChain: Invalid factory 0 "
+        );
         stokvelQuorum = _stokvelQuorum;
         contributionAsset = _contributionAsset;
+        factory = IMembershipFactory(_factory); // Add this
+    }
+
+    function getMembership(string memory email) public view returns (address) {
+        bytes32 emailHash = keccak256(abi.encodePacked(email));
+        return
+            factory.computeMembershipAddress(
+                address(this),
+                contributionAsset,
+                emailHash
+            );
     }
 
     // ==================== Admin Functions ====================
@@ -153,32 +190,43 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
 
     /**
      * @notice Add a new member to the stokvel
-     * @param newMember Address of the new member
+     * @param email address of the new member
      * @param stokvelContractIPFSHash IPFS hash of the membership agreement
      */
     function join(
-        address newMember,
+        string calldata email,
         string calldata stokvelContractIPFSHash
     ) external onlyOwner whenNotPaused {
-        require(
-            newMember != address(0),
-            "StokvelOnChain: Invalid member address"
-        );
-        require(
-            members[newMember].state != MOUType.ACTIVE,
-            "StokvelOnChain: Member already active"
-        );
         require(
             bytes(stokvelContractIPFSHash).length > 0,
             "StokvelOnChain: IPFS hash required"
         );
+        require(
+            bytes(email).length > 0,
+            "StokvelOnChain: Member email required"
+        );
 
-        members[newMember] = Member({
+        bytes32 emailHash = keccak256(abi.encodePacked(email));
+        address membershipAddr = factory.computeMembershipAddress(
+            address(this),
+            contributionAsset,
+            emailHash
+        );
+        require(
+            members[membershipAddr].state != MOUType.ACTIVE,
+            "StokvelOnChain: Member already active"
+        );
+
+        address deployed = factory.deployMembership(address(this), contributionAsset, emailHash);
+
+        assert(deployed == membershipAddr);
+
+        members[membershipAddr] = Member({
             contractIPFSHash: stokvelContractIPFSHash,
             state: MOUType.ACTIVE
         });
 
-        emit MembershipActivated(newMember, stokvelContractIPFSHash);
+        emit MembershipActivated(membershipAddr, stokvelContractIPFSHash);
     }
 
     /**
@@ -188,8 +236,8 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
      * @param stokvelTransferIPFSHash IPFS hash of the transfer agreement
      */
     function transferMembership(
-        address newMember,
         address fromMember,
+        address newMember,
         string calldata stokvelTransferIPFSHash
     ) external onlyOwner onlyActiveMember(fromMember) whenNotPaused {
         require(
@@ -197,8 +245,12 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
             "StokvelOnChain: Invalid new member address"
         );
         require(
-            members[newMember].state != MOUType.ACTIVE,
-            "StokvelOnChain: New member already active"
+            fromMember != address(0),
+            "StokvelOnChain: Invalid member address"
+        );
+        require(
+            members[newMember].state != MOUType.NONMEMBER,
+            "StokvelOnChain: New member must join"
         );
         require(
             bytes(stokvelTransferIPFSHash).length > 0,
@@ -217,18 +269,20 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
             );
         }
 
-        // Update membership states
-        members[newMember] = Member({
-            contractIPFSHash: stokvelTransferIPFSHash,
-            state: MOUType.ACTIVE
-        });
+        if (members[newMember].state != MOUType.ACTIVE) {
+            // Update membership states
+            members[newMember] = Member({
+                contractIPFSHash: stokvelTransferIPFSHash,
+                state: MOUType.ACTIVE
+            });
+        }
 
         members[fromMember].contractIPFSHash = stokvelTransferIPFSHash;
         members[fromMember].state = MOUType.TRANSFERRED;
 
         emit MembershipTransferred(
-            newMember,
             fromMember,
+            newMember,
             stokvelTransferIPFSHash
         );
     }
@@ -267,8 +321,9 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
      * @param amount Amount of contribution asset to deposit
      */
     function contribute(
+        address membershipAddress,
         uint256 amount
-    ) external nonReentrant onlyActiveMember(msg.sender) whenNotPaused {
+    ) external nonReentrant onlyActiveMember(membershipAddress) whenNotPaused {
         require(
             contributionAsset != address(0),
             "StokvelOnChain: Contribution asset not set"
@@ -276,7 +331,11 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
         require(amount > 0, "StokvelOnChain: Amount must be greater than 0");
 
         // Transfer contribution asset from member to contract
-        IERC20(contributionAsset).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20(contributionAsset).safeTransferFrom(
+           membershipAddress,
+            address(this),
+            amount
+        );
 
         // Mint contribution tokens (ID 1) to the member
         _mint(msg.sender, CONTRIBUTION_TOKEN_ID, amount, "");
@@ -389,7 +448,9 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
         uint256 supply = totalSupply(CONTRIBUTION_TOKEN_ID);
         require(supply > 0, "StokvelOnChain: No total supply");
 
-        uint256 contractBalance = IERC20(contributionAsset).balanceOf(address(this));
+        uint256 contractBalance = IERC20(contributionAsset).balanceOf(
+            address(this)
+        );
         require(contractBalance > 0, "StokvelOnChain: No assets to distribute");
 
         // Calculate proportional amount
@@ -422,7 +483,9 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
         uint256 supply = totalSupply(CONTRIBUTION_TOKEN_ID);
         require(supply > 0, "StokvelOnChain: No total supply");
 
-        uint256 contractBalance =  IERC20(contributionAsset).balanceOf(address(this));
+        uint256 contractBalance = IERC20(contributionAsset).balanceOf(
+            address(this)
+        );
         require(contractBalance > 0, "StokvelOnChain: No assets to distribute");
 
         for (uint256 i = 0; i < membersList.length; i++) {
@@ -435,7 +498,10 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
 
                 if (amountToGiveMember > 0) {
                     _burn(member, CONTRIBUTION_TOKEN_ID, memberBalance);
-                     IERC20(contributionAsset).safeTransfer(member, amountToGiveMember);
+                    IERC20(contributionAsset).safeTransfer(
+                        member,
+                        amountToGiveMember
+                    );
                     emit ContributionDistributed(member, amountToGiveMember);
                 }
             }
@@ -498,7 +564,7 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
         if (contributionAsset == address(0)) {
             return 0;
         }
-        return  IERC20(contributionAsset).balanceOf(address(this));
+        return IERC20(contributionAsset).balanceOf(address(this));
     }
 
     /**
