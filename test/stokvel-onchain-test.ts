@@ -168,7 +168,7 @@ describe("StokvelOnChain", function () {
             // Owner (who is an active member) makes a contribution on behalf of membership
             await stokvel.connect(owner).contribute(membershipAddr, amount);
 
-            const balance = await stokvel.balanceOf(owner.address, await stokvel.CONTRIBUTION_TOKEN_ID());
+            const balance = await stokvel.balanceOf(membershipAddr, await stokvel.CONTRIBUTION_TOKEN_ID());
             expect(balance).to.equal(amount);
         });
 
@@ -185,7 +185,7 @@ describe("StokvelOnChain", function () {
 
             await expect(stokvel.connect(owner).contribute(membershipAddr, amount))
                 .to.emit(stokvel, "ContributionMade")
-                .withArgs(owner.address, amount);
+                .withArgs(membershipAddr, amount);
         });
 
         it("Should revert if contribution asset not set", async function () {

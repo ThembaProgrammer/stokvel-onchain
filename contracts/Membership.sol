@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 /**
  * @title Membership
  * @notice Individual membership contract deployed via CREATE2 for each stokvel member
@@ -17,7 +18,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  * - Auto-approves StokvelOnChain for contribution asset transfers
  * - Account abstraction compatible via Context
  */
-contract Membership is Context {
+contract Membership is Context, IERC1155Receiver {
     using ECDSA for bytes32;
 
     // Custom Errors
@@ -177,5 +178,31 @@ contract Membership is Context {
      */
     function getBalance(address token) external view returns (uint256) {
         return IERC20(token).balanceOf(address(this));
+    }
+
+    function onERC1155Received(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes calldata
+    ) external pure override returns (bytes4) {
+        return this.onERC1155Received.selector;
+    }
+
+    function onERC1155BatchReceived(
+        address,
+        address,
+        uint256[] calldata,
+        uint256[] calldata,
+        bytes calldata
+    ) external pure override returns (bytes4) {
+        return this.onERC1155BatchReceived.selector;
+    }
+
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override returns (bool) {
+        return interfaceId == type(IERC1155Receiver).interfaceId;
     }
 }

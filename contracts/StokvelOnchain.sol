@@ -338,9 +338,9 @@ contract StokvelOnChain is ERC1155Supply, ReentrancyGuard, Pausable, Ownable {
         );
 
         // Mint contribution tokens (ID 1) to the member
-        _mint(msg.sender, CONTRIBUTION_TOKEN_ID, amount, "");
+        _mint(membershipAddress, CONTRIBUTION_TOKEN_ID, amount, "");
 
-        emit ContributionMade(msg.sender, amount);
+        emit ContributionMade(membershipAddress, amount);
     }
 
     // ==================== Governance Functions ====================
